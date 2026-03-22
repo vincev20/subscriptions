@@ -597,6 +597,11 @@ a {
     perspective: 1000px;
 }
 
+.profile-shell-card {
+    width: 80%;
+    margin: 0 auto;
+}
+
 .glass-card::before {
     content: '';
     position: absolute;
@@ -2260,6 +2265,12 @@ a {
 
     .social-login {
         flex-direction: column;
+    }
+}
+
+@media (max-width: 1024px) {
+    .profile-shell-card {
+        width: 100%;
     }
 }
 

@@ -20,27 +20,30 @@
 //  SUBSCRIPTION PORTAL — CLOUDFLARE WORKER
 //  Environment variables to set in Cloudflare Dashboard:
 //    HUBSPOT_TOKEN   — your HubSpot Private App token
-//    ALLOWED_ORIGIN  — e.g. https://yourclientsite.com
+//    ALLOWED_ORIGIN  — e.g. https://yourclientsite.com or
+//                      https://yourclientsite.com,http://localhost:3000
 //    PDF_FOLDER_ID   — numeric folder ID from HubSpot File Manager
 // ============================================================
 
 export default {
   async fetch(request, env) {
+    const requestOrigin = request.headers.get('Origin');
+    const corsOrigin = getCorsOrigin(requestOrigin, env.ALLOWED_ORIGIN);
 
     // ── CORS preflight ──
     if (request.method === 'OPTIONS') {
-      return corsPreflightResponse(env.ALLOWED_ORIGIN);
+      return corsPreflightResponse(corsOrigin);
     }
 
     // ── Block any origin that isn't your DNN site ──
-    const origin = request.headers.get('Origin') || '';
+    const origin = requestOrigin || '';
     // if (origin !== env.ALLOWED_ORIGIN) {
     //   return new Response('Forbidden', { status: 403 });
     // }
 
     const url      = new URL(request.url);
     const path     = url.pathname;
-    const corsHdrs = corsHeaders(env.ALLOWED_ORIGIN);
+    const corsHdrs = corsHeaders(corsOrigin);
 
     // ── Route requests ──
     try {
@@ -69,7 +72,7 @@ export default {
 // ============================================================
 //  ROUTE 1: GET /api/subscriber
 //  Query params: email, uid, fp (fingerprint)
-//  Returns: { firstname, lastname, subscribed }
+//  Returns: profile + subscription fields from HubSpot
 // ============================================================
 async function getSubscriber(url, env, corsHdrs) {
   const email = url.searchParams.get('email');
@@ -100,11 +103,17 @@ async function getSubscriber(url, env, corsHdrs) {
   // }
 
   const hsHeaders = hubspotHeaders(env.HUBSPOT_TOKEN);
+  const contactProperties = [
+    'firstname',
+    'lastname',
+    'lifo_status',
+    'lifo_gpd_social_media_announcement_link'
+  ];
 
   // ── Fetch contact from HubSpot CRM ──
   const contactRes = await fetch(
     `https://api.hubapi.com/crm/v3/objects/contacts/${encodeURIComponent(email)}` +
-    `?idProperty=email&properties=firstname,lastname`,
+    `?idProperty=email&properties=${encodeURIComponent(contactProperties.join(','))}`,
     { headers: hsHeaders }
   );
 
@@ -122,6 +131,16 @@ async function getSubscriber(url, env, corsHdrs) {
   }
 
   const contact = await contactRes.json();
+  const properties = contact.properties || {};
+  const subscription = {
+    type:        'LIFO® Certified Practitioner',
+    status:      properties.lifo_status || '',
+    startDate:   '',
+    expiryDate:  '',
+    accessLevel: '',
+    nextRenewal: '',
+    testing:     properties.lifo_gpd_social_media_announcement_link || ''
+  };
 
   // ── Fetch subscription status ──
   const subRes = await fetch(
@@ -140,9 +159,10 @@ async function getSubscriber(url, env, corsHdrs) {
   // ── Return only what the frontend needs ──
   return Response.json(
     {
-      firstname:  contact.properties?.firstname || '',
-      lastname:   contact.properties?.lastname  || '',
-      subscribed: isSubscribed
+      firstname:  properties.firstname || '',
+      lastname:   properties.lastname  || '',
+      subscribed: isSubscribed,
+      subscription
     },
     { headers: corsHdrs }
   );
@@ -267,8 +287,9 @@ function corsHeaders(origin) {
   return {
     'Access-Control-Allow-Origin':  origin,
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Content-Type':                 'application/json'
+    'Access-Control-Allow-Headers': 'Content-Type, Accept',
+    'Content-Type':                 'application/json',
+    'Vary':                         'Origin'
   };
 }
 
@@ -283,3 +304,30 @@ function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+function getCorsOrigin(requestOrigin, allowedOrigin) {
+  const defaultOrigins = new Set([
+    'http://localhost:3000',
+    'http://127.0.0.1:3000'
+  ]);
+
+  const configuredOrigins = String(allowedOrigin || '')
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean);
+
+  if (configuredOrigins.includes('*')) {
+    return requestOrigin || '*';
+  }
+
+  configuredOrigins.forEach(origin => defaultOrigins.add(origin));
+
+  if (!requestOrigin) {
+    return configuredOrigins[0] || '*';
+  }
+
+  if (defaultOrigins.has(requestOrigin)) {
+    return requestOrigin;
+  }
+
+  return configuredOrigins[0] || 'http://localhost:3000';
+}

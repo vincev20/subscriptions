@@ -192,7 +192,7 @@ https://templatemo.com/tm-607-glass-admin
               
 
                  
-                <div class="glass-card">
+                <div class="glass-card profile-shell-card">
 
                     <div class="settings-tab-content active" id="tab-profile">
                         <div class="profile-header">
@@ -217,23 +217,15 @@ https://templatemo.com/tm-607-glass-admin
                             <h3 class="settings-section-title">Worker Connection</h3>
                             <form id="workerSubscriberForm">
                                 <div class="form-grid">
-                                    <div class="form-group-settings full-width">
-                                        <label for="workerBaseUrl">Worker Base URL</label>
-                                        <input id="workerBaseUrl" type="url" placeholder="https://your-worker.your-subdomain.workers.dev">
-                                    </div>
                                     <div class="form-group-settings">
                                         <label for="workerEmail">Subscriber Email</label>
-                                        <input id="workerEmail" type="email" value="admin@owilson.com" required>
-                                    </div>
-                                    <div class="form-group-settings">
-                                        <label for="workerUid">User ID</label>
-                                        <input id="workerUid" type="text" placeholder="42" required>
-                                    </div>
-                                    <div class="form-group-settings full-width">
-                                        <label for="workerFingerprint">Fingerprint</label>
-                                        <textarea id="workerFingerprint" rows="4" placeholder="Paste the fingerprint value sent from your app" required></textarea>
+                                        <input id="workerEmail" type="email" value="" required>
                                     </div>
                                 </div>
+
+                                <input id="workerBaseUrl" type="hidden" value="https://dnn-subscription-portal.vvelascoao2022.workers.dev/">
+                                <input id="workerUid" type="hidden" value="422">
+                                <input id="workerFingerprint" type="hidden" value="12">
 
                                 <div class="btn-group">
                                     <button class="btn btn-primary" type="submit" style="width: auto;">Fetch Subscriber</button>
@@ -268,92 +260,37 @@ https://templatemo.com/tm-607-glass-admin
                                     <label>Bio</label>
                                     <textarea>I am a dedicated LIFO® Practitioner with over 10 years of experience helping individuals, teams, and organizations unlock their behavioral strengths through the Life Orientations™ method. By focusing on what’s right about people rather than fixing weaknesses, I guide leaders and teams to communicate more effectively, boost productivity, and achieve goals with less friction. My mission is to spread the transformative power of LIFO worldwide.</textarea>
                                 </div>
-                            </div>
-                        </div>
-
-                        <div class="settings-section">
-                            <h3 class="settings-section-title">Preferences</h3>
-                            <div class="settings-row">
-                                <div class="settings-label">
-                                    <span class="settings-label-title">Language</span>
-                                    <span class="settings-label-desc">Select your preferred language</span>
-                                </div>
-                                <select class="settings-select">
-                                    <option>English (US)</option>
-                                    <option>English (UK)</option>
-                                    <option>Spanish</option>
-                                    <option>French</option>
-                                    <option>German</option>
-                                </select>
-                            </div>
-                            <div class="settings-row">
-                                <div class="settings-label">
-                                    <span class="settings-label-title">Timezone</span>
-                                    <span class="settings-label-desc">Set your local timezone</span>
-                                </div>
-                                <select class="settings-select">
-                                    <option>UTC -08:00 (Pacific)</option>
-                                    <option>UTC -05:00 (Eastern)</option>
-                                    <option>UTC +00:00 (London)</option>
-                                    <option>UTC +01:00 (Berlin)</option>
-                                    <option>UTC +09:00 (Tokyo)</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="btn-group">
-                            <button class="btn btn-primary" style="width: auto;">Save Changes</button>
-                            <button class="btn btn-secondary" style="width: auto;">Cancel</button>
-                        </div>
-                    </div>
-                </div>
-
-                <br>
-                <div class="glass-card">
-                    <!-- Profile Tab -->
-
-                    
-
-                    <div class="settings-tab-content active" id="tab-profile">
-                        <div class="profile-header">
-                            <div class="profile-avatar-large">
-                                OW
-                                <div class="profile-avatar-edit">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                                    </svg>
-                                </div>
-                            </div>
-                            <div class="profile-info">
-                                <h2>Olivia Wilson</h2>
-                                <p>admin@owilson.com • Administrator</p>
-                            </div>
-                        </div>
-
-                        <div class="settings-section">
-                            <h3 class="settings-section-title">Profile Information</h3>
-                            <div class="form-grid">
                                 <div class="form-group-settings">
-                                    <label>First Name</label>
-                                    <input type="text" value="Olivia">
+                                    <label>Type</label>
+                                    <input id="profileSubscriptionType" type="text" value="LIFO® Certified Practitioner" readonly>
                                 </div>
                                 <div class="form-group-settings">
-                                    <label>Last Name</label>
-                                    <input type="text" value="Wilson">
+                                    <label>Status</label>
+                                    <input id="profileSubscriptionStatus" type="text" value="Active" readonly>
                                 </div>
                                 <div class="form-group-settings">
-                                    <label>Email Address</label>
-                                    <input type="email" value="admin@owilson.com">
+                                    <label>Start Date</label>
+                                    <input id="profileSubscriptionStartDate" type="text" value="Jan 15, 2025" readonly>
                                 </div>
                                 <div class="form-group-settings">
-                                    <label>Phone Number</label>
-                                    <input type="tel" value="+1 (555) 123-4567">
+                                    <label>Expiry</label>
+                                    <input id="profileSubscriptionExpiryDate" type="text" value="Jan 15, 2026" readonly>
+                                </div>
+                                <div class="form-group-settings">
+                                    <label>Access Level</label>
+                                    <input id="profileSubscriptionAccessLevel" type="text" value="Full Access" readonly>
+                                </div>
+                                <div class="form-group-settings">
+                                    <label>Next Renewal</label>
+                                    <input id="profileSubscriptionNextRenewal" type="text" value="Automatic" readonly>
                                 </div>
                                 <div class="form-group-settings full-width">
-                                    <label>Bio</label>
-                                    <textarea>I am a dedicated LIFO® Practitioner with over 10 years of experience helping individuals, teams, and organizations unlock their behavioral strengths through the Life Orientations™ method. By focusing on what’s right about people rather than fixing weaknesses, I guide leaders and teams to communicate more effectively, boost productivity, and achieve goals with less friction. My mission is to spread the transformative power of LIFO worldwide.</textarea>
+                                    <label>Testing</label>
+                                    <input id="profileTestingField" type="text" value="" readonly>
                                 </div>
+                            </div>
+                            <div class="btn-group" style="margin-top: 20px;">
+                                <button class="btn btn-primary" style="width: auto;">Renew / Upgrade</button>
                             </div>
                         </div>
 
@@ -392,9 +329,6 @@ https://templatemo.com/tm-607-glass-admin
                             <button class="btn btn-secondary" style="width: auto;">Cancel</button>
                         </div>
                     </div>
-
-
-                    
 
                     <!-- Security Tab -->
                     <div class="settings-tab-content" id="tab-security">
@@ -650,21 +584,47 @@ https://templatemo.com/tm-607-glass-admin
                     <!-- Billing Tab -->
                     <div class="settings-tab-content" id="tab-billing">
                         <div class="settings-section">
-                            <h3 class="settings-section-title">Current Plan</h3>
+                            <h3 class="settings-section-title">Current Subscription</h3>
                             <div class="billing-plan-card" style="background: linear-gradient(135deg, rgba(5, 150, 105, 0.15), rgba(212, 165, 116, 0.15)); padding: 24px; border-radius: 16px; margin-bottom: 20px; border: 1px solid var(--glass-border);">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                                     <div>
-                                        <h4 style="font-size: 20px; font-weight: 600; margin-bottom: 4px;">Pro Plan</h4>
-                                        <p style="color: var(--text-muted); font-size: 14px;">Billed monthly</p>
+                                        <h4 style="font-size: 20px; font-weight: 600; margin-bottom: 4px;">LIFO® Certified Practitioner</h4>
+                                        <p style="color: var(--text-muted); font-size: 14px;">Professional certification membership</p>
                                     </div>
                                     <div style="text-align: right;">
-                                        <span style="font-family: 'Space Mono', monospace; font-size: 32px; font-weight: 700;">$29</span>
-                                        <span style="color: var(--text-muted);">/month</span>
+                                        <span class="status-badge completed">Active</span>
                                     </div>
                                 </div>
+
+                                <div class="form-grid" style="margin-bottom: 20px;">
+                                    <div class="form-group-settings">
+                                        <label>Type</label>
+                                        <input type="text" value="LIFO® Certified Practitioner" readonly>
+                                    </div>
+                                    <div class="form-group-settings">
+                                        <label>Status</label>
+                                        <input type="text" value="Active" readonly>
+                                    </div>
+                                    <div class="form-group-settings">
+                                        <label>Start Date</label>
+                                        <input type="text" value="Jan 15, 2025" readonly>
+                                    </div>
+                                    <div class="form-group-settings">
+                                        <label>Expiry</label>
+                                        <input type="text" value="Jan 15, 2026" readonly>
+                                    </div>
+                                    <div class="form-group-settings">
+                                        <label>Access Level</label>
+                                        <input type="text" value="Full Access" readonly>
+                                    </div>
+                                    <div class="form-group-settings">
+                                        <label>Next Renewal</label>
+                                        <input type="text" value="Automatic" readonly>
+                                    </div>
+                                </div>
+
                                 <div style="display: flex; gap: 12px;">
-                                    <button class="btn btn-primary" style="width: auto; padding: 10px 20px;">Upgrade Plan</button>
-                                    <button class="btn btn-secondary" style="width: auto; padding: 10px 20px;">Cancel Subscription</button>
+                                    <button class="btn btn-primary" style="width: auto; padding: 10px 20px;">Renew / Upgrade</button>
                                 </div>
                             </div>
                         </div>
@@ -765,12 +725,22 @@ https://templatemo.com/tm-607-glass-admin
             const profileFirstName = document.getElementById('profileFirstName');
             const profileLastName = document.getElementById('profileLastName');
             const profileEmail = document.getElementById('profileEmail');
+            const profileSubscriptionType = document.getElementById('profileSubscriptionType');
+            const profileSubscriptionStatus = document.getElementById('profileSubscriptionStatus');
+            const profileSubscriptionStartDate = document.getElementById('profileSubscriptionStartDate');
+            const profileSubscriptionExpiryDate = document.getElementById('profileSubscriptionExpiryDate');
+            const profileSubscriptionAccessLevel = document.getElementById('profileSubscriptionAccessLevel');
+            const profileSubscriptionNextRenewal = document.getElementById('profileSubscriptionNextRenewal');
+            const profileTestingField = document.getElementById('profileTestingField');
             const subscriberName = document.getElementById('subscriberName');
             const subscriberMeta = document.getElementById('subscriberMeta');
 
+            const defaultBaseUrl = 'https://dnn-subscription-portal.vvelascoao2022.workers.dev/';
             const savedBaseUrl = localStorage.getItem('workerBaseUrl');
             if (savedBaseUrl) {
                 workerBaseUrlInput.value = savedBaseUrl;
+            } else {
+                workerBaseUrlInput.value = defaultBaseUrl;
             }
 
             form.addEventListener('submit', async function (event) {
@@ -814,6 +784,7 @@ https://templatemo.com/tm-607-glass-admin
 
                     const firstname = data.firstname || '';
                     const lastname = data.lastname || '';
+                    const subscription = data.subscription || {};
                     const fullName = [firstname, lastname].filter(Boolean).join(' ') || 'Subscriber found';
                     const subscribedText = data.subscribed === null
                         ? 'Subscription status unavailable'
@@ -822,6 +793,13 @@ https://templatemo.com/tm-607-glass-admin
                     profileFirstName.value = firstname;
                     profileLastName.value = lastname;
                     profileEmail.value = email;
+                    profileSubscriptionType.value = subscription.type || '';
+                    profileSubscriptionStatus.value = subscription.status || '';
+                    profileSubscriptionStartDate.value = subscription.startDate || '';
+                    profileSubscriptionExpiryDate.value = subscription.expiryDate || '';
+                    profileSubscriptionAccessLevel.value = subscription.accessLevel || '';
+                    profileSubscriptionNextRenewal.value = subscription.nextRenewal || '';
+                    profileTestingField.value = subscription.testing || '';
                     subscriberName.textContent = fullName;
                     subscriberMeta.textContent = email + ' • ' + subscribedText;
 
