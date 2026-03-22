@@ -55,8 +55,14 @@ export default {
       if (path === '/api/pdfs' && request.method === 'GET') {
         return await getPdfs(env, corsHdrs);
       }
+      if (path === '/api/pdfs-by-folder' && request.method === 'GET') {
+        return await getPdfsByFolder(url, env, corsHdrs);
+      }
       if (path === '/api/pdf-url' && request.method === 'GET') {
         return await getPdfSignedUrl(url, env, corsHdrs);
+      }
+      if (path === '/api/pdf-download' && request.method === 'GET') {
+        return await downloadPdf(url, env, corsHdrs);
       }
       if (path === '/api/profile-image' && request.method === 'POST') {
         return await uploadProfileImage(request, env, corsHdrs);
@@ -342,15 +348,18 @@ async function uploadProfileImage(request, env, corsHdrs) {
 //  Returns: { files: [{ id, name }] }
 // ============================================================
 async function getPdfs(env, corsHdrs) {
-  const res = await fetch(
-    `https://api.hubapi.com/files/v3/files/search` +
-    `?parentFolderId=${env.PDF_FOLDER_ID}&type=PRIVATE&limit=50`,
-    { headers: hubspotHeaders(env.HUBSPOT_TOKEN) }
-  );
+  const searchUrl = new URL('https://api.hubapi.com/files/v3/files/search');
+  searchUrl.searchParams.set('parentFolderIds', String(env.PDF_FOLDER_ID));
+  searchUrl.searchParams.set('limit', '50');
+
+  const res = await fetch(searchUrl.toString(), {
+    headers: hubspotHeaders(env.HUBSPOT_TOKEN)
+  });
 
   if (!res.ok) {
+    const errorBody = await safeJson(res);
     return Response.json(
-      { error: 'Failed to fetch documents' },
+      { error: errorBody.message || errorBody.error || 'Failed to fetch documents' },
       { status: 502, headers: corsHdrs }
     );
   }
@@ -362,6 +371,87 @@ async function getPdfs(env, corsHdrs) {
   }));
 
   return Response.json({ files }, { headers: corsHdrs });
+}
+
+// ============================================================
+//  ROUTE 3: GET /api/pdfs-by-folder?id=FOLDERID
+//  Returns: { files: [{ id, name, path, thumbnail }] }
+// ============================================================
+async function getPdfsByFolder(url, env, corsHdrs) {
+  const folderId = String(url.searchParams.get('id') || '209745447557').trim();
+  const debugMode = url.searchParams.get('debug') === '1';
+
+  if (!/^\d+$/.test(folderId)) {
+    return Response.json(
+      { error: 'Invalid folder ID' },
+      { status: 400, headers: corsHdrs }
+    );
+  }
+
+  const folderRes = await fetch(
+    `https://api.hubapi.com/files/v3/folders/${folderId}`,
+    { headers: hubspotHeaders(env.HUBSPOT_TOKEN) }
+  );
+
+  if (folderRes.status === 404) {
+    return Response.json(
+      { error: 'Folder not found' },
+      { status: 404, headers: corsHdrs }
+    );
+  }
+
+  if (!folderRes.ok) {
+    return Response.json(
+      { error: 'Failed to fetch folder details' },
+      { status: 502, headers: corsHdrs }
+    );
+  }
+
+  const folder = await folderRes.json();
+  const filesResult = await fetchFilesByParentFolder(folderId, env.HUBSPOT_TOKEN);
+
+  if (!filesResult.ok) {
+    return Response.json(
+      { error: filesResult.error || 'Failed to fetch documents' },
+      { status: 502, headers: corsHdrs }
+    );
+  }
+
+  const files = mapPdfFiles(filesResult.files);
+
+  if (debugMode) {
+    return Response.json(
+      {
+        folder: {
+          id: folder.id,
+          path: folder.path || '',
+          name: folder.name || ''
+        },
+        matchCount: filesResult.files.length,
+        pdfCount: files.length,
+        sampleMatches: filesResult.files.slice(0, 20).map(file => ({
+          id: file.id || '',
+          name: file.name || '',
+          path: file.path || '',
+          parentFolderId: file.parentFolderId || '',
+          type: file.type || '',
+          archived: Boolean(file.archived)
+        }))
+      },
+      { headers: corsHdrs }
+    );
+  }
+
+  return Response.json(
+    {
+      folder: {
+        id: folder.id,
+        path: folder.path || ''
+      },
+      files
+    },
+    { headers: corsHdrs }
+  );
 }
 
 
@@ -402,6 +492,59 @@ async function getPdfSignedUrl(url, env, corsHdrs) {
     { url: data.url, expiresAt: data.expiresAt },
     { headers: corsHdrs }
   );
+}
+
+// ============================================================
+//  ROUTE 4: GET /api/pdf-download?id=FILEID&name=FILENAME
+//  Streams the HubSpot file back as a download attachment
+// ============================================================
+async function downloadPdf(url, env, corsHdrs) {
+  const fileId = url.searchParams.get('id');
+  const requestedName = sanitizeDownloadName(url.searchParams.get('name') || 'document');
+
+  if (!fileId || !/^\d+$/.test(fileId)) {
+    return Response.json(
+      { error: 'Invalid file ID' },
+      { status: 400, headers: corsHdrs }
+    );
+  }
+
+  const signedUrlRes = await fetch(
+    `https://api.hubapi.com/files/v3/files/${fileId}/signed-url?expirationSeconds=300`,
+    { headers: hubspotHeaders(env.HUBSPOT_TOKEN) }
+  );
+
+  if (signedUrlRes.status === 404) {
+    return Response.json(
+      { error: 'File not found' },
+      { status: 404, headers: corsHdrs }
+    );
+  }
+  if (!signedUrlRes.ok) {
+    return Response.json(
+      { error: 'Failed to generate download link' },
+      { status: 502, headers: corsHdrs }
+    );
+  }
+
+  const signedUrlData = await signedUrlRes.json();
+  const fileRes = await fetch(signedUrlData.url);
+
+  if (!fileRes.ok) {
+    return Response.json(
+      { error: 'Failed to download file from HubSpot' },
+      { status: 502, headers: corsHdrs }
+    );
+  }
+
+  const headers = new Headers(corsHdrs);
+  headers.set('Content-Type', fileRes.headers.get('Content-Type') || 'application/pdf');
+  headers.set('Content-Disposition', `attachment; filename="${requestedName}.pdf"`);
+
+  return new Response(fileRes.body, {
+    status: 200,
+    headers
+  });
 }
 
 
@@ -583,4 +726,71 @@ async function safeJson(response) {
   } catch {
     return {};
   }
+}
+
+function sanitizeDownloadName(value) {
+  return String(value || 'document')
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim() || 'document';
+}
+
+function buildResourceThumbnail(fileName) {
+  const normalized = String(fileName || '').toLowerCase();
+
+  if (normalized.includes('communication')) {
+    return 'img/L301US_2022_05_COMBINED_thumbnail.png';
+  }
+  if (normalized.includes('compatibility')) {
+    return 'img/press2.png';
+  }
+  if (normalized.includes('strength')) {
+    return 'img/press3.png';
+  }
+
+  return 'img/press1.png';
+}
+
+async function fetchFilesByParentFolder(folderId, token) {
+  const searchUrl = new URL('https://api.hubapi.com/files/v3/files/search');
+  searchUrl.searchParams.set('parentFolderIds', String(folderId));
+  searchUrl.searchParams.set('limit', '100');
+  searchUrl.searchParams.set('sort', 'name');
+
+  const response = await fetch(searchUrl.toString(), {
+    headers: hubspotHeaders(token)
+  });
+
+  if (!response.ok) {
+    const errorBody = await safeJson(response);
+    return {
+      ok: false,
+      error: errorBody.message || errorBody.error || 'Failed to fetch documents',
+      files: []
+    };
+  }
+
+  const data = await response.json();
+  return {
+    ok: true,
+    files: Array.isArray(data.results) ? data.results : []
+  };
+}
+
+function mapPdfFiles(files) {
+  return (files || [])
+    .filter(file =>
+      file &&
+      !file.archived &&
+      (
+        /\.pdf$/i.test(file.path || '') ||
+        String(file.type || '').toUpperCase() === 'DOCUMENT'
+      )
+    )
+    .map(file => ({
+      id: file.id,
+      name: String(file.name || '').replace(/\.pdf$/i, ''),
+      path: file.path || '',
+      thumbnail: buildResourceThumbnail(file.name)
+    }));
 }
