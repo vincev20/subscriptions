@@ -500,7 +500,20 @@ https://templatemo.com/tm-607-glass-admin
                             <br>
                             <div id="resourceSecondaryStatus" style="margin-bottom: 18px; color: var(--text-muted); font-size: 14px;">Loading additional resources...</div>
                             <section class="stats-grid additional-resources-grid" id="cards-secondary"></section>
-                            
+                            <div class="resources-pagination" id="resourcePagination">
+                                <div class="resources-pagination-size">
+                                    <label for="resourcePageSize">Show</label>
+                                    <select class="settings-select resources-page-size" id="resourcePageSize">
+                                        <option value="10">10</option>
+                                        <option value="20">20</option>
+                                    </select>
+                                </div>
+                                <div class="resources-pagination-nav">
+                                    <button class="card-btn" id="resourcePrevPage" type="button">Previous</button>
+                                    <span id="resourcePageInfo">Page 1 of 1</span>
+                                    <button class="card-btn" id="resourceNextPage" type="button">Next</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

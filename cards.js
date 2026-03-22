@@ -23,6 +23,7 @@ LIFO Core Program,L703,Strength Reminder Card,img/press2.png`;
   const ADDITIONAL_FOLDER_ID = "209745447557";
   const ADDITIONAL_CACHE_KEY = `additionalResources:${ADDITIONAL_FOLDER_ID}`;
   const ADDITIONAL_CACHE_TTL_MS = 5 * 60 * 1000;
+  const ADDITIONAL_PAGE_SIZE_KEY = `additionalResourcesPageSize:${ADDITIONAL_FOLDER_ID}`;
 
   const rows = raw
     .split(/\r?\n/)
@@ -43,8 +44,44 @@ LIFO Core Program,L703,Strength Reminder Card,img/press2.png`;
   const downloadButtons = document.querySelectorAll("[data-download-code]");
   let fileIndexPromise = null;
   let additionalFilesPromise = null;
+  let additionalFiles = [];
+  let additionalCurrentPage = 1;
+  let additionalPageSize = readAdditionalPageSize();
 
   if (secondaryMount) {
+    const pageSizeSelect = document.getElementById("resourcePageSize");
+    const prevPageButton = document.getElementById("resourcePrevPage");
+    const nextPageButton = document.getElementById("resourceNextPage");
+
+    if (pageSizeSelect) {
+      pageSizeSelect.value = String(additionalPageSize);
+      pageSizeSelect.addEventListener("change", () => {
+        additionalPageSize = Number(pageSizeSelect.value) || 10;
+        additionalCurrentPage = 1;
+        writeAdditionalPageSize(additionalPageSize);
+        renderAdditionalPage();
+      });
+    }
+
+    if (prevPageButton) {
+      prevPageButton.addEventListener("click", () => {
+        if (additionalCurrentPage > 1) {
+          additionalCurrentPage -= 1;
+          renderAdditionalPage();
+        }
+      });
+    }
+
+    if (nextPageButton) {
+      nextPageButton.addEventListener("click", () => {
+        const totalPages = getAdditionalTotalPages();
+        if (additionalCurrentPage < totalPages) {
+          additionalCurrentPage += 1;
+          renderAdditionalPage();
+        }
+      });
+    }
+
     loadAdditionalResources();
   }
 
@@ -221,17 +258,15 @@ LIFO Core Program,L703,Strength Reminder Card,img/press2.png`;
   }
 
   function renderAdditionalCards(files, secondaryCardsEl, secondaryStatusEl) {
+    additionalFiles = files.slice();
+    const totalPages = getAdditionalTotalPages();
+    if (additionalCurrentPage > totalPages) {
+      additionalCurrentPage = totalPages;
+    }
+
     secondaryStatusEl.textContent = "Click any resource to download the HubSpot PDF.";
     secondaryStatusEl.style.color = "var(--text-muted)";
-    secondaryCardsEl.innerHTML = files.map(file => renderFolderCard(file)).join("");
-
-    secondaryCardsEl.querySelectorAll("[data-download-file-id]").forEach(button => {
-      button.addEventListener("click", () => {
-        const fileId = button.getAttribute("data-download-file-id") || "";
-        const fileName = button.getAttribute("data-download-file-name") || "document";
-        triggerDirectDownload(button, fileId, fileName, secondaryStatusEl);
-      });
-    });
+    renderAdditionalPage();
   }
 
   function renderFolderCard(file) {
@@ -293,6 +328,54 @@ LIFO Core Program,L703,Strength Reminder Card,img/press2.png`;
     }
   }
 
+  function renderAdditionalPage() {
+    const secondaryStatusEl = document.getElementById("resourceSecondaryStatus");
+    const pageInfo = document.getElementById("resourcePageInfo");
+    const prevPageButton = document.getElementById("resourcePrevPage");
+    const nextPageButton = document.getElementById("resourceNextPage");
+    const paginationShell = document.getElementById("resourcePagination");
+
+    if (!secondaryMount) {
+      return;
+    }
+
+    const totalPages = getAdditionalTotalPages();
+    const startIndex = (additionalCurrentPage - 1) * additionalPageSize;
+    const pageFiles = additionalFiles.slice(startIndex, startIndex + additionalPageSize);
+
+    secondaryMount.innerHTML = pageFiles.map(file => renderFolderCard(file)).join("");
+
+    secondaryMount.querySelectorAll("[data-download-file-id]").forEach(button => {
+      button.addEventListener("click", () => {
+        const fileId = button.getAttribute("data-download-file-id") || "";
+        const fileName = button.getAttribute("data-download-file-name") || "document";
+        triggerDirectDownload(button, fileId, fileName, secondaryStatusEl);
+      });
+    });
+
+    if (pageInfo) {
+      pageInfo.textContent = additionalFiles.length
+        ? `Page ${additionalCurrentPage} of ${totalPages}`
+        : "Page 0 of 0";
+    }
+
+    if (prevPageButton) {
+      prevPageButton.disabled = additionalCurrentPage <= 1;
+    }
+
+    if (nextPageButton) {
+      nextPageButton.disabled = additionalCurrentPage >= totalPages;
+    }
+
+    if (paginationShell) {
+      paginationShell.style.display = additionalFiles.length ? "flex" : "none";
+    }
+  }
+
+  function getAdditionalTotalPages() {
+    return Math.max(1, Math.ceil(additionalFiles.length / additionalPageSize));
+  }
+
   function readAdditionalFilesCache() {
     try {
       const raw = sessionStorage.getItem(ADDITIONAL_CACHE_KEY);
@@ -322,6 +405,24 @@ LIFO Core Program,L703,Strength Reminder Card,img/press2.png`;
         savedAt: Date.now(),
         files
       }));
+    } catch (_error) {
+      // Ignore storage write failures.
+    }
+  }
+
+  function readAdditionalPageSize() {
+    try {
+      const raw = sessionStorage.getItem(ADDITIONAL_PAGE_SIZE_KEY);
+      const parsed = Number(raw);
+      return parsed === 20 ? 20 : 10;
+    } catch (_error) {
+      return 10;
+    }
+  }
+
+  function writeAdditionalPageSize(value) {
+    try {
+      sessionStorage.setItem(ADDITIONAL_PAGE_SIZE_KEY, String(value));
     } catch (_error) {
       // Ignore storage write failures.
     }
