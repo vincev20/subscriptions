@@ -112,7 +112,8 @@ async function getSubscriber(url, env, corsHdrs) {
     'firstname',
     'lastname',
     'lifo_status',
-    'lifo_gpd_social_media_announcement_link'
+    'lifo_gpd_social_media_announcement_link',
+    'profile_image_file_id'
   ];
   const profileImageProperty = sanitizePropertyName(env.HUBSPOT_PROFILE_IMAGE_PROPERTY || 'profile_image_path');
   if (profileImageProperty) {
@@ -172,7 +173,8 @@ async function getSubscriber(url, env, corsHdrs) {
       lastname:   properties.lastname  || '',
       subscribed: isSubscribed,
       subscription,
-      profileImageUrl: profileImageProperty ? (properties[profileImageProperty] || '') : ''
+      profileImageUrl: profileImageProperty ? (properties[profileImageProperty] || '') : '',
+      profileImageFileId: properties.profile_image_file_id || ''
     },
     { headers: corsHdrs }
   );
@@ -226,6 +228,31 @@ async function uploadProfileImage(request, env, corsHdrs) {
     );
   }
 
+  const hsHeaders = hubspotHeaders(env.HUBSPOT_TOKEN);
+  const contactLookupRes = await fetch(
+    `https://api.hubapi.com/crm/v3/objects/contacts/${encodeURIComponent(email)}` +
+    `?idProperty=email&properties=${encodeURIComponent(['profile_image_file_id'].join(','))}`,
+    { headers: hsHeaders }
+  );
+
+  if (contactLookupRes.status === 404) {
+    return Response.json(
+      { error: 'Subscriber not found' },
+      { status: 404, headers: corsHdrs }
+    );
+  }
+
+  if (!contactLookupRes.ok) {
+    const lookupError = await safeJson(contactLookupRes);
+    return Response.json(
+      { error: lookupError.message || lookupError.error || 'Failed to load current profile image details' },
+      { status: 502, headers: corsHdrs }
+    );
+  }
+
+  const contactData = await contactLookupRes.json();
+  const previousFileId = String(contactData.properties?.profile_image_file_id || '').trim();
+
   const isValid = await validateFingerprint(email, uid, fp, env);
   // if (!isValid) {
   //   return Response.json(
@@ -235,13 +262,16 @@ async function uploadProfileImage(request, env, corsHdrs) {
   // }
 
   const uploadForm = new FormData();
+  const folderPath = env.PROFILE_IMAGE_FOLDER_PATH || '/subscription-portal/profile-images';
   const safeFileName = buildProfileImageFileName(email, file.name);
-  uploadForm.set('file', file, safeFileName);
-  uploadForm.set('fileName', safeFileName);
-  uploadForm.set('folderPath', env.PROFILE_IMAGE_FOLDER_PATH || '/subscription-portal/profile-images');
-  uploadForm.set('options', JSON.stringify({
+  const fileReplaceOptions = JSON.stringify({
     access: 'PUBLIC_NOT_INDEXABLE'
-  }));
+  });
+  uploadForm.set('file', file, safeFileName);
+  uploadForm.set('options', fileReplaceOptions);
+
+  uploadForm.set('fileName', safeFileName);
+  uploadForm.set('folderPath', folderPath);
 
   const uploadRes = await fetch('https://api.hubapi.com/files/v3/files', {
     method: 'POST',
@@ -269,7 +299,8 @@ async function uploadProfileImage(request, env, corsHdrs) {
         headers: hubspotHeaders(env.HUBSPOT_TOKEN),
         body: JSON.stringify({
           properties: {
-            [profileImageProperty]: profileImageUrl
+            [profileImageProperty]: profileImageUrl,
+            profile_image_file_id: String(uploadedFile.id || '')
           }
         })
       }
@@ -288,12 +319,18 @@ async function uploadProfileImage(request, env, corsHdrs) {
     }
   }
 
+  let deleteDiagnostics = { attempted: [], deleted: [], failures: [] };
+  if (previousFileId && uploadedFile.id && String(previousFileId) !== String(uploadedFile.id)) {
+    deleteDiagnostics = await deleteFilesByIds([previousFileId], env.HUBSPOT_TOKEN);
+  }
+
   return Response.json(
     {
       profileImageUrl,
       fileId: uploadedFile.id || '',
       storedOnContact: Boolean(profileImageProperty && profileImageUrl),
-      contactProperty: profileImageProperty || ''
+      contactProperty: profileImageProperty || '',
+      deleteDiagnostics
     },
     { headers: corsHdrs }
   );
@@ -479,6 +516,48 @@ function buildProfileImageFileName(email, originalName) {
   const extension = extensionMatch ? extensionMatch[0] : '.png';
   const slug = email.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   return `${slug || 'contact'}-profile${extension}`;
+}
+
+async function deleteFilesByIds(fileIds, token) {
+  const attempted = fileIds
+    .map(fileId => String(fileId || '').trim())
+    .filter(Boolean)
+    .map(fileId => ({ id: fileId }));
+
+  const deleteResults = await Promise.all(attempted.map(async file => {
+    const response = await fetch(`https://api.hubapi.com/files/v3/files/${file.id}`, {
+      method: 'DELETE',
+      headers: hubspotAuthHeaders(token)
+    }).catch(() => null);
+
+    if (!response) {
+      return {
+        ok: false,
+        id: String(file.id),
+        status: 0,
+        body: { error: 'Delete request failed before receiving a response' }
+      };
+    }
+
+    return {
+      ok: response.ok,
+      id: String(file.id),
+      status: response.status,
+      body: response.ok ? {} : await safeJson(response)
+    };
+  }));
+
+  return {
+    attempted,
+    deleted: deleteResults.filter(result => result.ok).map(result => result.id),
+    failures: deleteResults
+      .filter(result => !result.ok)
+      .map(result => ({
+        id: result.id,
+        status: result.status,
+        body: result.body
+      }))
+  };
 }
 
 function normalizeHubSpotFileUrl(file) {
