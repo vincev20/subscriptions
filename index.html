@@ -207,9 +207,41 @@ https://templatemo.com/tm-607-glass-admin
                                     </svg>
                                 </div>
                             </div>
-                            <div class="profile-info">
-                                <h2>Olivia Wilson</h2>
-                                <p>admin@owilson.com • Administrator</p>
+                        <div class="profile-info">
+                                <h2 id="subscriberName">Olivia Wilson</h2>
+                                <p id="subscriberMeta">admin@owilson.com • Administrator</p>
+                            </div>
+                        </div>
+
+                        <div class="settings-section">
+                            <h3 class="settings-section-title">Worker Connection</h3>
+                            <form id="workerSubscriberForm">
+                                <div class="form-grid">
+                                    <div class="form-group-settings full-width">
+                                        <label for="workerBaseUrl">Worker Base URL</label>
+                                        <input id="workerBaseUrl" type="url" placeholder="https://your-worker.your-subdomain.workers.dev">
+                                    </div>
+                                    <div class="form-group-settings">
+                                        <label for="workerEmail">Subscriber Email</label>
+                                        <input id="workerEmail" type="email" value="admin@owilson.com" required>
+                                    </div>
+                                    <div class="form-group-settings">
+                                        <label for="workerUid">User ID</label>
+                                        <input id="workerUid" type="text" placeholder="42" required>
+                                    </div>
+                                    <div class="form-group-settings full-width">
+                                        <label for="workerFingerprint">Fingerprint</label>
+                                        <textarea id="workerFingerprint" rows="4" placeholder="Paste the fingerprint value sent from your app" required></textarea>
+                                    </div>
+                                </div>
+
+                                <div class="btn-group">
+                                    <button class="btn btn-primary" type="submit" style="width: auto;">Fetch Subscriber</button>
+                                </div>
+                            </form>
+
+                            <div id="workerStatus" style="margin-top: 16px; color: var(--text-muted); font-size: 14px;">
+                                Enter your worker URL and subscriber values, then fetch the profile from <code>/api/subscriber</code>.
                             </div>
                         </div>
 
@@ -218,15 +250,15 @@ https://templatemo.com/tm-607-glass-admin
                             <div class="form-grid">
                                 <div class="form-group-settings">
                                     <label>First Name</label>
-                                    <input type="text" value="Olivia">
+                                    <input id="profileFirstName" type="text" value="Olivia">
                                 </div>
                                 <div class="form-group-settings">
                                     <label>Last Name</label>
-                                    <input type="text" value="Wilson">
+                                    <input id="profileLastName" type="text" value="Wilson">
                                 </div>
                                 <div class="form-group-settings">
                                     <label>Email Address</label>
-                                    <input type="email" value="admin@owilson.com">
+                                    <input id="profileEmail" type="email" value="admin@owilson.com">
                                 </div>
                                 <div class="form-group-settings">
                                     <label>Phone Number</label>
@@ -719,6 +751,89 @@ https://templatemo.com/tm-607-glass-admin
     </footer>
 
     <script src="templatemo-glass-admin-script.js"></script>
+    <script>
+        (function () {
+            const form = document.getElementById('workerSubscriberForm');
+            if (!form) return;
+
+            const workerBaseUrlInput = document.getElementById('workerBaseUrl');
+            const emailInput = document.getElementById('workerEmail');
+            const uidInput = document.getElementById('workerUid');
+            const fingerprintInput = document.getElementById('workerFingerprint');
+            const statusEl = document.getElementById('workerStatus');
+
+            const profileFirstName = document.getElementById('profileFirstName');
+            const profileLastName = document.getElementById('profileLastName');
+            const profileEmail = document.getElementById('profileEmail');
+            const subscriberName = document.getElementById('subscriberName');
+            const subscriberMeta = document.getElementById('subscriberMeta');
+
+            const savedBaseUrl = localStorage.getItem('workerBaseUrl');
+            if (savedBaseUrl) {
+                workerBaseUrlInput.value = savedBaseUrl;
+            }
+
+            form.addEventListener('submit', async function (event) {
+                event.preventDefault();
+
+                const baseUrl = workerBaseUrlInput.value.trim().replace(/\/$/, '');
+                const email = emailInput.value.trim();
+                const uid = uidInput.value.trim();
+                const fp = fingerprintInput.value.trim();
+
+                if (!baseUrl || !email || !uid || !fp) {
+                    statusEl.textContent = 'Please fill in the worker URL, email, user ID, and fingerprint.';
+                    statusEl.style.color = '#ff6b6b';
+                    return;
+                }
+
+                localStorage.setItem('workerBaseUrl', baseUrl);
+
+                const params = new URLSearchParams({
+                    email: email,
+                    uid: uid,
+                    fp: fp
+                });
+
+                statusEl.textContent = 'Fetching subscriber details...';
+                statusEl.style.color = 'var(--text-muted)';
+
+                try {
+                    const response = await fetch(baseUrl + '/api/subscriber?' + params.toString(), {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+
+                    const data = await response.json().catch(() => ({}));
+
+                    if (!response.ok) {
+                        throw new Error(data.error || 'Request failed');
+                    }
+
+                    const firstname = data.firstname || '';
+                    const lastname = data.lastname || '';
+                    const fullName = [firstname, lastname].filter(Boolean).join(' ') || 'Subscriber found';
+                    const subscribedText = data.subscribed === null
+                        ? 'Subscription status unavailable'
+                        : (data.subscribed ? 'Subscribed' : 'Not subscribed');
+
+                    profileFirstName.value = firstname;
+                    profileLastName.value = lastname;
+                    profileEmail.value = email;
+                    subscriberName.textContent = fullName;
+                    subscriberMeta.textContent = email + ' • ' + subscribedText;
+
+                    statusEl.textContent = 'Subscriber loaded successfully.';
+                    statusEl.style.color = '#10b981';
+                } catch (error) {
+                    statusEl.textContent = error.message || 'Unable to reach the worker.';
+                    statusEl.style.color = '#ff6b6b';
+                }
+            });
+        }());
+    </script>
     <!-- TemplateMo 607 Glass Admin -->
 </body>
 </html>

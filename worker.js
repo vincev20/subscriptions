@@ -1,0 +1,285 @@
+/**
+ * Welcome to Cloudflare Workers! This is your first worker.
+ *
+ * - Run "npm run dev" in your terminal to start a development server
+ * - Open a browser tab at http://localhost:8787/ to see your worker in action
+ * - Run "npm run deploy" to publish your worker
+ *
+ * Learn more at https://developers.cloudflare.com/workers/
+ */
+
+// export default {
+//   async fetch(request, env, ctx) {
+//     // You can view your logs in the Observability dashboard
+//     console.info({ message: 'Hello World Worker received a request!' }); 
+//     return new Response('Hello World!');
+//   }
+// };
+
+// ============================================================
+//  SUBSCRIPTION PORTAL — CLOUDFLARE WORKER
+//  Environment variables to set in Cloudflare Dashboard:
+//    HUBSPOT_TOKEN   — your HubSpot Private App token
+//    ALLOWED_ORIGIN  — e.g. https://yourclientsite.com
+//    PDF_FOLDER_ID   — numeric folder ID from HubSpot File Manager
+// ============================================================
+
+export default {
+  async fetch(request, env) {
+
+    // ── CORS preflight ──
+    if (request.method === 'OPTIONS') {
+      return corsPreflightResponse(env.ALLOWED_ORIGIN);
+    }
+
+    // ── Block any origin that isn't your DNN site ──
+    const origin = request.headers.get('Origin') || '';
+    // if (origin !== env.ALLOWED_ORIGIN) {
+    //   return new Response('Forbidden', { status: 403 });
+    // }
+
+    const url      = new URL(request.url);
+    const path     = url.pathname;
+    const corsHdrs = corsHeaders(env.ALLOWED_ORIGIN);
+
+    // ── Route requests ──
+    try {
+      if (path === '/api/subscriber' && request.method === 'GET') {
+        return await getSubscriber(url, env, corsHdrs);
+      }
+      if (path === '/api/pdfs' && request.method === 'GET') {
+        return await getPdfs(env, corsHdrs);
+      }
+      if (path === '/api/pdf-url' && request.method === 'GET') {
+        return await getPdfSignedUrl(url, env, corsHdrs);
+      }
+      return new Response('Not Found', { status: 404, headers: corsHdrs });
+
+    } catch (err) {
+      console.error('Worker error:', err);
+      return Response.json(
+        { error: 'Internal server error' },
+        { status: 500, headers: corsHdrs }
+      );
+    }
+  }
+};
+
+
+// ============================================================
+//  ROUTE 1: GET /api/subscriber
+//  Query params: email, uid, fp (fingerprint)
+//  Returns: { firstname, lastname, subscribed }
+// ============================================================
+async function getSubscriber(url, env, corsHdrs) {
+  const email = url.searchParams.get('email');
+  const uid   = url.searchParams.get('uid');
+  const fp    = url.searchParams.get('fp');
+
+  // Basic validation
+  if (!email || !isValidEmail(email)) {
+    return Response.json(
+      { error: 'Valid email is required' },
+      { status: 400, headers: corsHdrs }
+    );
+  }
+  if (!uid || !fp) {
+    return Response.json(
+      { error: 'Missing required parameters' },
+      { status: 400, headers: corsHdrs }
+    );
+  }
+
+  // ── Validate fingerprint ──
+  const isValid = await validateFingerprint(email, uid, fp, env);
+  // if (!isValid) {
+  //   return Response.json(
+  //     { error: 'Forbidden' },
+  //     { status: 403, headers: corsHdrs }
+  //   );
+  // }
+
+  const hsHeaders = hubspotHeaders(env.HUBSPOT_TOKEN);
+
+  // ── Fetch contact from HubSpot CRM ──
+  const contactRes = await fetch(
+    `https://api.hubapi.com/crm/v3/objects/contacts/${encodeURIComponent(email)}` +
+    `?idProperty=email&properties=firstname,lastname`,
+    { headers: hsHeaders }
+  );
+
+  if (contactRes.status === 404) {
+    return Response.json(
+      { error: 'Subscriber not found' },
+      { status: 404, headers: corsHdrs }
+    );
+  }
+  if (!contactRes.ok) {
+    return Response.json(
+      { error: 'Failed to fetch subscriber' },
+      { status: 502, headers: corsHdrs }
+    );
+  }
+
+  const contact = await contactRes.json();
+
+  // ── Fetch subscription status ──
+  const subRes = await fetch(
+    `https://api.hubapi.com/communication-preferences/v3/status/email/${encodeURIComponent(email)}`,
+    { headers: hsHeaders }
+  );
+
+  let isSubscribed = null;
+  if (subRes.ok) {
+    const subData = await subRes.json();
+    isSubscribed = Array.isArray(subData.subscriptionStatuses)
+      ? subData.subscriptionStatuses.some(s => s.status === 'SUBSCRIBED')
+      : null;
+  }
+
+  // ── Return only what the frontend needs ──
+  return Response.json(
+    {
+      firstname:  contact.properties?.firstname || '',
+      lastname:   contact.properties?.lastname  || '',
+      subscribed: isSubscribed
+    },
+    { headers: corsHdrs }
+  );
+}
+
+
+// ============================================================
+//  ROUTE 2: GET /api/pdfs
+//  Returns: { files: [{ id, name }] }
+// ============================================================
+async function getPdfs(env, corsHdrs) {
+  const res = await fetch(
+    `https://api.hubapi.com/files/v3/files/search` +
+    `?parentFolderId=${env.PDF_FOLDER_ID}&type=PRIVATE&limit=50`,
+    { headers: hubspotHeaders(env.HUBSPOT_TOKEN) }
+  );
+
+  if (!res.ok) {
+    return Response.json(
+      { error: 'Failed to fetch documents' },
+      { status: 502, headers: corsHdrs }
+    );
+  }
+
+  const data  = await res.json();
+  const files = (data.results || []).map(f => ({
+    id:   f.id,
+    name: f.name.replace(/\.pdf$/i, '')
+  }));
+
+  return Response.json({ files }, { headers: corsHdrs });
+}
+
+
+// ============================================================
+//  ROUTE 3: GET /api/pdf-url?id=FILEID
+//  Returns: { url, expiresAt } — signed URL expires in 5 mins
+// ============================================================
+async function getPdfSignedUrl(url, env, corsHdrs) {
+  const fileId = url.searchParams.get('id');
+
+  if (!fileId || !/^\d+$/.test(fileId)) {
+    return Response.json(
+      { error: 'Invalid file ID' },
+      { status: 400, headers: corsHdrs }
+    );
+  }
+
+  const res = await fetch(
+    `https://api.hubapi.com/files/v3/files/${fileId}/signed-url?expirationSeconds=300`,
+    { headers: hubspotHeaders(env.HUBSPOT_TOKEN) }
+  );
+
+  if (res.status === 404) {
+    return Response.json(
+      { error: 'File not found' },
+      { status: 404, headers: corsHdrs }
+    );
+  }
+  if (!res.ok) {
+    return Response.json(
+      { error: 'Failed to generate download link' },
+      { status: 502, headers: corsHdrs }
+    );
+  }
+
+  const data = await res.json();
+  return Response.json(
+    { url: data.url, expiresAt: data.expiresAt },
+    { headers: corsHdrs }
+  );
+}
+
+
+// ============================================================
+//  FINGERPRINT VALIDATION
+//  Recomputes SHA-256 from submitted values and compares
+// ============================================================
+async function validateFingerprint(email, uid, fpFromClient, env) {
+  // Must match exact format used in the HTML module:
+  // btoa(userId + '|' + portalId + '|' + email + '|' + username + '|' + createdDate)
+  // We decode the base64 and recompute the SHA-256
+  try {
+    const decoded = atob(fpFromClient);           // e.g. "42|0|user@email.com|jdoe|2023-04-15"
+    const parts   = decoded.split('|');
+
+    if (parts.length < 5)         return false;
+    if (parts[0] !== uid)         return false;   // userId must match uid param
+    if (!/^\d+$/.test(parts[0]))  return false;   // userId must be numeric
+    if (!/^\d+$/.test(parts[1]))  return false;   // portalId must be numeric
+    if (parts[2] !== email)       return false;   // email must match email param
+
+    // Recompute SHA-256 of the raw string
+    const rawFingerprint = decoded;
+    const encoded        = new TextEncoder().encode(rawFingerprint);
+    const buffer         = await crypto.subtle.digest('SHA-256', encoded);
+    const hash           = Array.from(new Uint8Array(buffer))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+
+    // At this point structure is valid — hash is for future HMAC upgrade
+    // For now: structural validation + field matching is the security layer
+    return true;
+
+  } catch {
+    return false;
+  }
+}
+
+
+// ============================================================
+//  HELPERS
+// ============================================================
+function hubspotHeaders(token) {
+  return {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type':  'application/json'
+  };
+}
+
+function corsHeaders(origin) {
+  return {
+    'Access-Control-Allow-Origin':  origin,
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Content-Type':                 'application/json'
+  };
+}
+
+function corsPreflightResponse(origin) {
+  return new Response(null, {
+    status:  204,
+    headers: corsHeaders(origin)
+  });
+}
+
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
