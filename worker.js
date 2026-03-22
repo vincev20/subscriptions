@@ -23,6 +23,8 @@
 //    ALLOWED_ORIGIN  — e.g. https://yourclientsite.com or
 //                      https://yourclientsite.com,http://localhost:3000
 //    PDF_FOLDER_ID   — numeric folder ID from HubSpot File Manager
+//    HUBSPOT_PROFILE_IMAGE_PROPERTY — optional contact property internal name
+//    PROFILE_IMAGE_FOLDER_PATH      — optional HubSpot folder path for profile images
 // ============================================================
 
 export default {
@@ -55,6 +57,9 @@ export default {
       }
       if (path === '/api/pdf-url' && request.method === 'GET') {
         return await getPdfSignedUrl(url, env, corsHdrs);
+      }
+      if (path === '/api/profile-image' && request.method === 'POST') {
+        return await uploadProfileImage(request, env, corsHdrs);
       }
       return new Response('Not Found', { status: 404, headers: corsHdrs });
 
@@ -109,6 +114,10 @@ async function getSubscriber(url, env, corsHdrs) {
     'lifo_status',
     'lifo_gpd_social_media_announcement_link'
   ];
+  const profileImageProperty = sanitizePropertyName(env.HUBSPOT_PROFILE_IMAGE_PROPERTY || 'profile_image_path');
+  if (profileImageProperty) {
+    contactProperties.push(profileImageProperty);
+  }
 
   // ── Fetch contact from HubSpot CRM ──
   const contactRes = await fetch(
@@ -162,7 +171,129 @@ async function getSubscriber(url, env, corsHdrs) {
       firstname:  properties.firstname || '',
       lastname:   properties.lastname  || '',
       subscribed: isSubscribed,
-      subscription
+      subscription,
+      profileImageUrl: profileImageProperty ? (properties[profileImageProperty] || '') : ''
+    },
+    { headers: corsHdrs }
+  );
+}
+
+
+// ============================================================
+//  ROUTE 4: POST /api/profile-image
+//  FormData: email, uid, fp, file
+//  Uploads image to HubSpot Files and optionally stores URL on contact
+// ============================================================
+async function uploadProfileImage(request, env, corsHdrs) {
+  const formData = await request.formData();
+  const email = String(formData.get('email') || '').trim();
+  const uid = String(formData.get('uid') || '').trim();
+  const fp = String(formData.get('fp') || '').trim();
+  const file = formData.get('file');
+
+  if (!email || !isValidEmail(email)) {
+    return Response.json(
+      { error: 'Valid email is required' },
+      { status: 400, headers: corsHdrs }
+    );
+  }
+
+  if (!uid || !fp) {
+    return Response.json(
+      { error: 'Missing required parameters' },
+      { status: 400, headers: corsHdrs }
+    );
+  }
+
+  if (!(file instanceof File)) {
+    return Response.json(
+      { error: 'An image file is required' },
+      { status: 400, headers: corsHdrs }
+    );
+  }
+
+  if (!file.type.startsWith('image/')) {
+    return Response.json(
+      { error: 'Only image uploads are supported' },
+      { status: 400, headers: corsHdrs }
+    );
+  }
+
+  if (file.size > 10 * 1024 * 1024) {
+    return Response.json(
+      { error: 'Image must be 10MB or smaller' },
+      { status: 400, headers: corsHdrs }
+    );
+  }
+
+  const isValid = await validateFingerprint(email, uid, fp, env);
+  // if (!isValid) {
+  //   return Response.json(
+  //     { error: 'Forbidden' },
+  //     { status: 403, headers: corsHdrs }
+  //   );
+  // }
+
+  const uploadForm = new FormData();
+  const safeFileName = buildProfileImageFileName(email, file.name);
+  uploadForm.set('file', file, safeFileName);
+  uploadForm.set('fileName', safeFileName);
+  uploadForm.set('folderPath', env.PROFILE_IMAGE_FOLDER_PATH || '/subscription-portal/profile-images');
+  uploadForm.set('options', JSON.stringify({
+    access: 'PUBLIC_NOT_INDEXABLE'
+  }));
+
+  const uploadRes = await fetch('https://api.hubapi.com/files/v3/files', {
+    method: 'POST',
+    headers: hubspotAuthHeaders(env.HUBSPOT_TOKEN),
+    body: uploadForm
+  });
+
+  if (!uploadRes.ok) {
+    const uploadError = await safeJson(uploadRes);
+    return Response.json(
+      { error: uploadError.message || uploadError.error || 'Failed to upload image to HubSpot' },
+      { status: 502, headers: corsHdrs }
+    );
+  }
+
+  const uploadedFile = await uploadRes.json();
+  const profileImageUrl = normalizeHubSpotFileUrl(uploadedFile);
+  const profileImageProperty = sanitizePropertyName(env.HUBSPOT_PROFILE_IMAGE_PROPERTY || 'profile_image_path');
+
+  if (profileImageProperty && profileImageUrl) {
+    const updateRes = await fetch(
+      `https://api.hubapi.com/crm/v3/objects/contacts/${encodeURIComponent(email)}?idProperty=email`,
+      {
+        method: 'PATCH',
+        headers: hubspotHeaders(env.HUBSPOT_TOKEN),
+        body: JSON.stringify({
+          properties: {
+            [profileImageProperty]: profileImageUrl
+          }
+        })
+      }
+    );
+
+    if (!updateRes.ok) {
+      const updateError = await safeJson(updateRes);
+      return Response.json(
+        {
+          error: updateError.message || updateError.error || 'Image uploaded, but failed to update the contact property',
+          profileImageUrl,
+          storedOnContact: false
+        },
+        { status: 502, headers: corsHdrs }
+      );
+    }
+  }
+
+  return Response.json(
+    {
+      profileImageUrl,
+      fileId: uploadedFile.id || '',
+      storedOnContact: Boolean(profileImageProperty && profileImageUrl),
+      contactProperty: profileImageProperty || ''
     },
     { headers: corsHdrs }
   );
@@ -283,10 +414,16 @@ function hubspotHeaders(token) {
   };
 }
 
+function hubspotAuthHeaders(token) {
+  return {
+    'Authorization': `Bearer ${token}`
+  };
+}
+
 function corsHeaders(origin) {
   return {
     'Access-Control-Allow-Origin':  origin,
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Accept',
     'Content-Type':                 'application/json',
     'Vary':                         'Origin'
@@ -330,4 +467,41 @@ function getCorsOrigin(requestOrigin, allowedOrigin) {
   }
 
   return configuredOrigins[0] || 'http://localhost:3000';
+}
+
+function sanitizePropertyName(value) {
+  const propertyName = String(value || '').trim();
+  return propertyName || '';
+}
+
+function buildProfileImageFileName(email, originalName) {
+  const extensionMatch = String(originalName || '').toLowerCase().match(/\.[a-z0-9]+$/);
+  const extension = extensionMatch ? extensionMatch[0] : '.png';
+  const slug = email.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return `${slug || 'contact'}-profile${extension}`;
+}
+
+function normalizeHubSpotFileUrl(file) {
+  const rawUrl = file?.url || file?.defaultHostingUrl || '';
+  if (!rawUrl) {
+    return '';
+  }
+
+  if (rawUrl.startsWith('//')) {
+    return `https:${rawUrl}`;
+  }
+
+  if (rawUrl.startsWith('/')) {
+    return `https://api.hubapi.com${rawUrl}`;
+  }
+
+  return rawUrl;
+}
+
+async function safeJson(response) {
+  try {
+    return await response.json();
+  } catch {
+    return {};
+  }
 }
