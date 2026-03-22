@@ -238,20 +238,22 @@ LIFO Core Program,L703,Strength Reminder Card,img/press2.png`;
     const title = file.name || "Document";
     const code = extractCodeFromName(title);
     return `
-<div class="glass-card glass-card-3d stat-card">
-  <div class="stat-card-inner">
-    <div class="stat-info">
-      <div>
+<div class="glass-card glass-card-3d stat-card additional-resource-card">
+  <div class="additional-resource-card-inner">
+    <div class="additional-resource-card-top">
+      <div class="stat-info additional-resource-copy">
         <h3>Subscription Files</h3>
         <div>${escapeHtml(code)}</div>
         <div class="stat-value">${escapeHtml(title)}</div>
-        <button class="stat-change positive" type="button" data-download-file-id="${escapeHtml(file.id)}" data-download-file-name="${escapeHtml(title)}">Download</button>
       </div>
-    </div>
-    <div class="stat-icon cyan">
+      <div class="stat-icon cyan additional-resource-icon">
       <div class="thumbnail">
         <img class="thumbnailsub" src="${escapeHtml(file.thumbnail || "img/press1.png")}" alt="">
       </div>
+    </div>
+    </div>
+    <div class="additional-resource-card-actions">
+      <button class="stat-change positive" type="button" data-download-file-id="${escapeHtml(file.id)}" data-download-file-name="${escapeHtml(title)}">Download</button>
     </div>
   </div>
 </div>`;
