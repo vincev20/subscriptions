@@ -747,9 +747,7 @@ https://templatemo.com/tm-607-glass-admin
                 }
             });
 
-            form.addEventListener('submit', async function (event) {
-                event.preventDefault();
-
+            async function loadSubscriberProfile() {
                 const baseUrl = workerBaseUrlInput.value.trim().replace(/\/$/, '');
                 const email = emailInput.value.trim();
                 const uid = uidInput.value.trim();
@@ -817,7 +815,16 @@ https://templatemo.com/tm-607-glass-admin
                     statusEl.textContent = error.message || 'Unable to reach the worker.';
                     statusEl.style.color = '#ff6b6b';
                 }
+            }
+
+            form.addEventListener('submit', async function (event) {
+                event.preventDefault();
+                await loadSubscriberProfile();
             });
+
+            if (emailInput.value.trim() && uidInput.value.trim() && fingerprintInput.value.trim()) {
+                loadSubscriberProfile();
+            }
 
             function appendCacheBust(url) {
                 if (!url) {
