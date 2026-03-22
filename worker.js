@@ -52,6 +52,9 @@ export default {
       if (path === '/api/subscriber' && request.method === 'GET') {
         return await getSubscriber(url, env, corsHdrs);
       }
+      if (path === '/api/subscriber-update' && request.method === 'POST') {
+        return await updateSubscriber(request, env, corsHdrs);
+      }
       if (path === '/api/pdfs' && request.method === 'GET') {
         return await getPdfs(env, corsHdrs);
       }
@@ -117,6 +120,8 @@ async function getSubscriber(url, env, corsHdrs) {
   const contactProperties = [
     'firstname',
     'lastname',
+    'email',
+    'phone',
     'lifo_status',
     'lifo_gpd_social_media_announcement_link',
     'profile_image_file_id'
@@ -177,10 +182,171 @@ async function getSubscriber(url, env, corsHdrs) {
     {
       firstname:  properties.firstname || '',
       lastname:   properties.lastname  || '',
+      email:      properties.email || email,
+      phone:      properties.phone || '',
       subscribed: isSubscribed,
       subscription,
       profileImageUrl: profileImageProperty ? (properties[profileImageProperty] || '') : '',
       profileImageFileId: properties.profile_image_file_id || ''
+    },
+    { headers: corsHdrs }
+  );
+}
+
+
+// ============================================================
+//  ROUTE 2: POST /api/subscriber-update
+//  JSON body: originalEmail, uid, fp, updates
+//  Updates only changed contact properties in HubSpot
+// ============================================================
+async function updateSubscriber(request, env, corsHdrs) {
+  const body = await request.json().catch(() => null);
+  const originalEmail = String(body?.originalEmail || '').trim();
+  const uid = String(body?.uid || '').trim();
+  const fp = String(body?.fp || '').trim();
+  const updates = body?.updates && typeof body.updates === 'object' ? body.updates : null;
+
+  if (!originalEmail || !isValidEmail(originalEmail)) {
+    return Response.json(
+      { error: 'Valid original email is required' },
+      { status: 400, headers: corsHdrs }
+    );
+  }
+
+  if (!uid || !fp) {
+    return Response.json(
+      { error: 'Missing required parameters' },
+      { status: 400, headers: corsHdrs }
+    );
+  }
+
+  if (!updates) {
+    return Response.json(
+      { error: 'No profile updates were provided' },
+      { status: 400, headers: corsHdrs }
+    );
+  }
+
+  const isValid = await validateFingerprint(originalEmail, uid, fp, env);
+  // if (!isValid) {
+  //   return Response.json(
+  //     { error: 'Forbidden' },
+  //     { status: 403, headers: corsHdrs }
+  //   );
+  // }
+
+  const normalizedUpdates = {};
+
+  if (Object.prototype.hasOwnProperty.call(updates, 'firstname')) {
+    normalizedUpdates.firstname = String(updates.firstname || '').trim();
+  }
+  if (Object.prototype.hasOwnProperty.call(updates, 'lastname')) {
+    normalizedUpdates.lastname = String(updates.lastname || '').trim();
+  }
+  if (Object.prototype.hasOwnProperty.call(updates, 'email')) {
+    const nextEmail = String(updates.email || '').trim();
+    if (!nextEmail || !isValidEmail(nextEmail)) {
+      return Response.json(
+        { error: 'A valid email address is required' },
+        { status: 400, headers: corsHdrs }
+      );
+    }
+    normalizedUpdates.email = nextEmail;
+  }
+  if (Object.prototype.hasOwnProperty.call(updates, 'phone')) {
+    normalizedUpdates.phone = String(updates.phone || '').trim();
+  }
+
+  if (Object.keys(normalizedUpdates).length === 0) {
+    return Response.json(
+      { error: 'No supported profile changes were provided' },
+      { status: 400, headers: corsHdrs }
+    );
+  }
+
+  const hsHeaders = hubspotHeaders(env.HUBSPOT_TOKEN);
+  const contactRes = await fetch(
+    `https://api.hubapi.com/crm/v3/objects/contacts/${encodeURIComponent(originalEmail)}` +
+    `?idProperty=email&properties=${encodeURIComponent('firstname,lastname,email,phone')}`,
+    { headers: hsHeaders }
+  );
+
+  if (contactRes.status === 404) {
+    return Response.json(
+      { error: 'Subscriber not found' },
+      { status: 404, headers: corsHdrs }
+    );
+  }
+
+  if (!contactRes.ok) {
+    return Response.json(
+      { error: 'Failed to fetch subscriber before updating' },
+      { status: 502, headers: corsHdrs }
+    );
+  }
+
+  const contact = await contactRes.json();
+  const contactId = contact.id;
+  const currentProperties = contact.properties || {};
+  const changedProperties = {};
+
+  Object.entries(normalizedUpdates).forEach(([key, value]) => {
+    const currentValue = String(currentProperties[key] || '').trim();
+    if (value !== currentValue) {
+      changedProperties[key] = value;
+    }
+  });
+
+  const mergedProperties = {
+    firstname: changedProperties.firstname ?? String(currentProperties.firstname || '').trim(),
+    lastname: changedProperties.lastname ?? String(currentProperties.lastname || '').trim(),
+    email: changedProperties.email ?? String(currentProperties.email || originalEmail).trim(),
+    phone: changedProperties.phone ?? String(currentProperties.phone || '').trim()
+  };
+
+  if (Object.keys(changedProperties).length === 0) {
+    return Response.json(
+      {
+        updated: false,
+        message: 'No profile changes were detected.',
+        updatedProperties: [],
+        firstname: mergedProperties.firstname,
+        lastname: mergedProperties.lastname,
+        email: mergedProperties.email,
+        phone: mergedProperties.phone
+      },
+      { headers: corsHdrs }
+    );
+  }
+
+  const updateRes = await fetch(
+    `https://api.hubapi.com/crm/v3/objects/contacts/${encodeURIComponent(contactId)}`,
+    {
+      method: 'PATCH',
+      headers: hsHeaders,
+      body: JSON.stringify({
+        properties: changedProperties
+      })
+    }
+  );
+
+  if (!updateRes.ok) {
+    const updateError = await safeJson(updateRes);
+    return Response.json(
+      { error: updateError.message || updateError.error || 'Failed to update subscriber' },
+      { status: 502, headers: corsHdrs }
+    );
+  }
+
+  return Response.json(
+    {
+      updated: true,
+      message: 'Profile changes saved successfully.',
+      updatedProperties: Object.keys(changedProperties),
+      firstname: mergedProperties.firstname,
+      lastname: mergedProperties.lastname,
+      email: mergedProperties.email,
+      phone: mergedProperties.phone
     },
     { headers: corsHdrs }
   );
