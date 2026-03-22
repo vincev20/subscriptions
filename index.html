@@ -173,7 +173,7 @@ https://templatemo.com/tm-607-glass-admin
                     <div class="settings-tab-content active" id="tab-profile">
                         <div class="profile-header">
                             <div class="profile-avatar-large">
-                                <img id="profileAvatarImage" class="picicon" src="img/blank.png" alt="Profile picture">
+                                <img id="profileAvatarImage" class="picicon" src="img/blank.png" alt="Profile picture" loading="eager" fetchpriority="high">
                                 <button id="profileAvatarTrigger" class="profile-avatar-edit" type="button" aria-label="Upload profile picture">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -737,7 +737,7 @@ https://templatemo.com/tm-607-glass-admin
                     }
 
                     if (data.profileImageUrl) {
-                        profileAvatarImage.src = appendCacheBust(data.profileImageUrl);
+                        setProfileAvatarSource(data.profileImageUrl, true);
                     }
 
                     avatarUploadStatus.textContent = data.storedOnContact
@@ -921,9 +921,9 @@ https://templatemo.com/tm-607-glass-admin
                     profileSubscriptionAccessLevel.value = subscription.accessLevel || '';
                     profileSubscriptionNextRenewal.value = subscription.nextRenewal || '';
                     if (data.profileImageUrl) {
-                        profileAvatarImage.src = appendCacheBust(data.profileImageUrl);
+                        setProfileAvatarSource(data.profileImageUrl);
                     } else {
-                        profileAvatarImage.src = defaultAvatarSrc;
+                        setProfileAvatarSource('');
                     }
                     subscriberName.textContent = fullName;
                     subscriberMeta.textContent = resolvedEmail + ' • ' + subscribedText;
@@ -971,6 +971,10 @@ https://templatemo.com/tm-607-glass-admin
                     phone: profile.phone || '',
                     subscribedText: profile.subscribedText || 'Subscription status unavailable'
                 };
+            }
+
+            function setProfileAvatarSource(url, forceRefresh) {
+                profileAvatarImage.src = forceRefresh ? appendCacheBust(url) : (url || defaultAvatarSrc);
             }
 
             function appendCacheBust(url) {
