@@ -14,8 +14,8 @@ LIFO Core Program,L702,Match-a-Style Game,img/press3.png
 LIFO Core Program,L703,Strength Reminder Card,img/press2.png`;
 
   const primaryMount = document.querySelector("#cards");
-  if (!primaryMount) return;
   const secondaryMount = document.querySelector("#cards-secondary");
+  if (!primaryMount && !secondaryMount) return;
 
   const workerBaseUrl = (localStorage.getItem("workerBaseUrl") || "https://dnn-subscription-portal.vvelascoao2022.workers.dev/")
     .trim()
@@ -35,13 +35,15 @@ LIFO Core Program,L703,Strength Reminder Card,img/press2.png`;
     .filter(cols => cols.length >= 4)
     .map(([category, code, title, img]) => ({ category, code, title, img }));
 
-  primaryMount.innerHTML = `
-    <div id="resourceDownloadStatus" style="margin-bottom: 18px; color: var(--text-muted); font-size: 14px;"></div>
-    ${items.map(item => renderCard(item)).join("")}
-  `;
+  if (primaryMount) {
+    primaryMount.innerHTML = `
+      <div id="resourceDownloadStatus" style="margin-bottom: 18px; color: var(--text-muted); font-size: 14px;"></div>
+      ${items.map(item => renderCard(item)).join("")}
+    `;
+  }
 
   const statusEl = document.getElementById("resourceDownloadStatus");
-  const downloadButtons = document.querySelectorAll("[data-download-code]");
+  const downloadButtons = primaryMount ? document.querySelectorAll("[data-download-code]") : [];
   let fileIndexPromise = null;
   let additionalFilesPromise = null;
   let additionalFiles = [];
@@ -191,6 +193,9 @@ LIFO Core Program,L703,Strength Reminder Card,img/press2.png`;
   }
 
   function setStatus(message, color) {
+    if (!statusEl) {
+      return;
+    }
     statusEl.textContent = message;
     statusEl.style.color = color;
   }
