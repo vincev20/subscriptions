@@ -1,4 +1,5 @@
-<!-- Upload this fragment into the DNN HTML module source editor -->
+<!-- Upload this fragment into the DNN HTML module source editor.
+     It depends on sibling files dnn.css and dnn.js. -->
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 
@@ -10,6 +11,7 @@
 
 <link rel="stylesheet" href="dnn.css">
 
+<!-- The wrapper scopes theme/layout styles so they do not leak into the wider DNN page. -->
 <section class="allwrap">
 <!-- Animated Background -->
     <div class="background"></div>
@@ -171,6 +173,7 @@
                                         <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                                     </svg>
                                 </button>
+                                <!-- Hidden native file input; dnn.js opens it from the edit button above. -->
                                 <input id="profileAvatarFileInput" type="file" accept="image/*" hidden>
                             </div>
                             <div class="profile-info">
@@ -190,6 +193,7 @@
                                     </div>
                                 </div>
 
+                                <!-- Worker settings stay hidden in the UI, but dnn.js reads them for fetch/save/upload calls. -->
                                 <input id="workerBaseUrl" type="hidden" value="https://dnn-subscription-portal.vvelascoao2022.workers.dev/">
                                 <input id="workerUid" type="hidden" value="422">
                                 <input id="workerFingerprint" type="hidden" value="12">

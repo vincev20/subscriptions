@@ -21,6 +21,7 @@ https://templatemo.com/tm-607-glass-admin
 -->
 </head>
 <body>
+    <!-- resources-page enables resources-only sidebar/mobile overrides in dnn.css. -->
     <section class="allwrap resources-page">
     <!-- Animated Background -->
     <div class="background"></div>
@@ -168,7 +169,9 @@ https://templatemo.com/tm-607-glass-admin
                         <div class="profile-info">
                             <h2>Additional Resources</h2>
                             <br>
+                            <!-- resources.js replaces this status text during load / error / download states. -->
                             <div id="resourceSecondaryStatus" style="margin-bottom: 18px; color: var(--text-muted); font-size: 14px;">Loading additional resources...</div>
+                            <!-- resources.js renders HubSpot-backed resource cards into this grid. -->
                             <section class="stats-grid additional-resources-grid" id="cards-secondary"></section>
                             <div class="resources-pagination" id="resourcePagination">
                                 <div class="resources-pagination-size">
@@ -205,8 +208,8 @@ https://templatemo.com/tm-607-glass-admin
         <p>Copyright © 2026 BCon. Designed by Y</p>
     </footer>
 
-    <script src="templatemo-glass-admin-script.js"></script>
-    <script src="cards.js" defer></script>
+    <!-- resources.js contains the page-specific theme, pagination, and HubSpot resource loading logic. -->
+    <script src="resources.js" defer></script>
     <!-- TemplateMo 607 Glass Admin -->
 </body>
 </html>

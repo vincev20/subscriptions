@@ -197,6 +197,7 @@
   animation-delay: -10s;
 }
 .allwrap .dashboard {
+  /* Desktop layout keeps sidebar and content in normal flow to avoid DNN overlap issues. */
   display: flex !important;
   align-items: flex-start !important;
   gap: 24px !important;
@@ -205,6 +206,7 @@
   padding: 24px 24px 0 48px !important;
 }
 .allwrap .sidebar {
+  /* Sticky on desktop so the panel stays visible without using fixed positioning. */
   position: sticky;
   top: 24px;
   left: auto;
@@ -224,12 +226,14 @@
   margin-left: 50px;
 }
 .allwrap.resources-page .dashboard {
+  /* Resources keeps the sidebar in normal flow and uses its own spacing profile. */
   display: flex !important;
   align-items: flex-start !important;
   gap: 24px !important;
   padding: 24px 24px 0 48px !important;
 }
 .allwrap.resources-page .sidebar {
+  /* Resources page reuses this stylesheet, but keeps its own sidebar/mobile behavior. */
   position: sticky !important;
   top: 24px !important;
   left: auto !important;
@@ -239,6 +243,7 @@
   width: var(--sidebar-width) !important;
 }
 .allwrap.resources-page .main-content {
+  /* Override the profile-page width assumptions for the resources card grid. */
   flex: 1 1 auto !important;
   min-width: 0 !important;
   margin-left: 0 !important;
@@ -1283,6 +1288,7 @@
     padding: 0 !important;
   }
   .allwrap .sidebar {
+    /* Mobile falls back to an off-canvas sidebar pattern. */
     position: fixed;
     left: 0;
     top: 0;
@@ -1295,10 +1301,12 @@
     transform: translateX(0);
   }
   .allwrap.resources-page .dashboard {
+    /* On small screens the resources page drops the sidebar entirely instead of using the drawer. */
     display: block !important;
     padding: 0 !important;
   }
   .allwrap.resources-page .sidebar {
+    /* Resources intentionally hides the sidebar on small screens instead of using the drawer. */
     display: none !important;
     margin-left: 0 !important;
     transform: translateX(-100%) !important;

@@ -1,6 +1,7 @@
 (function () {
   "use strict";
 
+  // Fallback image used when the worker does not provide a usable public thumbnail URL.
   const STATIC_RESOURCE_THUMBNAIL_URL = "https://270115.fs1.hubspotusercontent-na1.net/hubfs/270115/subscription-portal/profile-images/press1.png";
 
   function initThemeToggle() {
@@ -26,6 +27,7 @@
       }
     }
 
+    // Respect a saved theme, but start first-time visits in light mode.
     const savedTheme = localStorage.getItem("theme") || "light";
     setTheme(savedTheme);
 
@@ -59,6 +61,7 @@
   function initSidebarLayout() {
     const wrap = document.querySelector(".allwrap");
     if (!wrap) return;
+    // The resources page now relies on CSS flow/sticky layout instead of the older offset math.
     wrap.style.setProperty("--sidebar-offset", "0px");
   }
 
@@ -70,6 +73,7 @@
       .trim()
       .replace(/\/$/, "");
     const additionalFolderId = "209745447557";
+    // Keep results in session storage so repeat visits feel instant within the same session.
     const additionalCacheKey = `additionalResources:${additionalFolderId}`;
     const additionalCacheTtlMs = 5 * 60 * 1000;
     const additionalPageSizeKey = `additionalResourcesPageSize:${additionalFolderId}`;
@@ -218,6 +222,7 @@
     }
 
     function stripPortalPrefix(value) {
+      // DNN can rewrite absolute asset URLs with /portals/0/, which breaks HubSpot-hosted images.
       return String(value || "").replace(/^\/portals\/0\//i, "");
     }
 
@@ -261,6 +266,7 @@
       const paginationShell = document.getElementById("resourcePagination");
       const totalPages = getAdditionalTotalPages();
       const startIndex = (additionalCurrentPage - 1) * additionalPageSize;
+      // Render only the current slice so large folders do not flood the DOM at once.
       const pageFiles = additionalFiles.slice(startIndex, startIndex + additionalPageSize);
 
       secondaryMount.innerHTML = pageFiles.map((file) => renderFolderCard(file)).join("");

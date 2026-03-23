@@ -24,6 +24,7 @@
             }
         }
 
+        // Respect a saved choice, but start first-time visitors in light mode.
         const savedTheme = localStorage.getItem('theme') || 'light';
         setTheme(savedTheme);
 
@@ -55,6 +56,7 @@
     function initSidebarLayout() {
         const wrap = document.querySelector('.allwrap');
         if (!wrap) return;
+        // Desktop layout is CSS-driven now; this only clears legacy offset behavior.
         wrap.style.setProperty('--sidebar-offset', '0px');
     }
 
@@ -178,6 +180,7 @@
                 }
 
                 const currentProfile = getEditableProfileState();
+                // Only send fields that actually changed so HubSpot updates stay minimal.
                 const updates = {};
 
                 if (currentProfile.firstname !== loadedSubscriberState.firstname) {
@@ -390,6 +393,7 @@
                 return defaultAvatarSrc;
             }
 
+            // Force the browser to fetch the new avatar immediately after upload.
             const separator = url.includes('?') ? '&' : '?';
             return url + separator + 't=' + Date.now();
         }
