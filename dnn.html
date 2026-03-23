@@ -295,13 +295,14 @@
     function initThemeToggle() {
         const themeToggle = document.getElementById('theme-toggle');
         if (!themeToggle) return;
+        const themeRoot = document.querySelector('.allwrap') || document.documentElement;
 
         const iconSun = themeToggle.querySelector('.icon-sun');
         const iconMoon = themeToggle.querySelector('.icon-moon');
         
         function setTheme(theme) {
             //theme = light;
-            document.documentElement.setAttribute('data-theme', theme);
+            themeRoot.setAttribute('data-theme', theme);
             localStorage.setItem('theme', theme);
             
             if (iconSun && iconMoon) {
@@ -320,7 +321,7 @@
         setTheme(savedTheme);
         
         themeToggle.addEventListener('click', () => {
-            const currentTheme = document.documentElement.getAttribute('data-theme');
+            const currentTheme = themeRoot.getAttribute('data-theme');
             setTheme(currentTheme === 'dark' ? 'light' : 'dark');
         });
     }

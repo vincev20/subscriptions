@@ -67,6 +67,11 @@ body {
   overflow-x: hidden;
   line-height: 1.6;
 }
+.allwrap {
+  font-family: 'Signika', sans-serif;
+  color: var(--text-primary);
+  line-height: 1.6;
+}
 @keyframes float {
   0%,
   100% {
@@ -82,7 +87,7 @@ body {
     transform: translate(20px, 10px) scale(1.02);
   }
 }
-.allwrap [data-theme="light"] {
+.allwrap[data-theme="light"] {
   /* Glass Colors - Light */
   --glass-bg: rgba(255, 255, 255, 0.6);
   --glass-border: rgba(0, 0, 0, 0.1);
@@ -111,24 +116,24 @@ body {
   --text-secondary: rgba(26, 26, 26, 0.7);
   --text-muted: rgba(26, 26, 26, 0.5);
 }
-.allwrap [data-theme="light"] .orb {
+.allwrap[data-theme="light"] .orb {
   opacity: 0.15;
 }
-.allwrap [data-theme="light"] .glass-card::before {
+.allwrap[data-theme="light"] .glass-card::before {
   background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.05), transparent);
 }
-.allwrap [data-theme="light"] .stat-value {
+.allwrap[data-theme="light"] .stat-value {
   background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
   -webkit-background-clip: text;
   background-clip: text;
 }
-.allwrap [data-theme="light"] .table-wrapper::-webkit-scrollbar-track {
+.allwrap[data-theme="light"] .table-wrapper::-webkit-scrollbar-track {
   background: rgba(0, 0, 0, 0.05);
 }
-.allwrap [data-theme="light"] .chart-wrapper::-webkit-scrollbar-track {
+.allwrap[data-theme="light"] .chart-wrapper::-webkit-scrollbar-track {
   background: rgba(0, 0, 0, 0.05);
 }
-.allwrap [data-theme="light"] .activity-list::-webkit-scrollbar-thumb {
+.allwrap[data-theme="light"] .activity-list::-webkit-scrollbar-thumb {
   background: var(--glass-border);
 }
 .allwrap *,
@@ -1053,10 +1058,10 @@ body {
   color: var(--text-primary);
   padding: 10px;
 }
-.allwrap [data-theme="light"] .settings-select {
+.allwrap[data-theme="light"] .settings-select {
   background-color: rgba(245, 245, 240, 0.95);
 }
-.allwrap [data-theme="light"] .settings-select option {
+.allwrap[data-theme="light"] .settings-select option {
   background: rgba(245, 245, 240, 0.98);
   color: #1a1a1a;
 }
