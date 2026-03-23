@@ -1,6 +1,8 @@
 (function () {
   "use strict";
 
+  const STATIC_RESOURCE_THUMBNAIL_URL = "https://270115.fs1.hubspotusercontent-na1.net/hubfs/270115/subscription-portal/profile-images/press1.png";
+
   function initThemeToggle() {
     const themeToggle = document.getElementById("theme-toggle");
     if (!themeToggle) return;
@@ -24,7 +26,7 @@
       }
     }
 
-    const savedTheme = localStorage.getItem("theme") || "dark";
+    const savedTheme = localStorage.getItem("theme") || "light";
     setTheme(savedTheme);
 
     themeToggle.addEventListener("click", () => {
@@ -56,54 +58,8 @@
 
   function initSidebarLayout() {
     const wrap = document.querySelector(".allwrap");
-    const sidebar = document.getElementById("sidebar");
-
-    if (!wrap || !sidebar) return;
-
-    const mobileBreakpoint = 992;
-    let animationFrameId = 0;
-
-    function updateSidebarOffset() {
-      if (window.innerWidth <= mobileBreakpoint) {
-        wrap.style.setProperty("--sidebar-offset", "0px");
-        return;
-      }
-
-      const wrapRect = wrap.getBoundingClientRect();
-      const sidebarRect = sidebar.getBoundingClientRect();
-      const sidebarGap = parseFloat(getComputedStyle(wrap).getPropertyValue("--sidebar-gap")) || 0;
-      const sidebarRight = Math.max(sidebarRect.right, sidebarRect.left + sidebar.offsetWidth);
-      const measuredOffset = Math.ceil(sidebarRight - wrapRect.left + sidebarGap);
-      const maxOffset = Math.max(0, wrap.clientWidth - 320);
-      const safeOffset = Math.max(0, Math.min(measuredOffset, maxOffset));
-
-      wrap.style.setProperty("--sidebar-offset", `${safeOffset}px`);
-    }
-
-    function scheduleSidebarOffsetUpdate() {
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-      }
-
-      animationFrameId = requestAnimationFrame(() => {
-        animationFrameId = 0;
-        updateSidebarOffset();
-      });
-    }
-
-    scheduleSidebarOffsetUpdate();
-    window.addEventListener("resize", scheduleSidebarOffsetUpdate);
-    window.addEventListener("load", scheduleSidebarOffsetUpdate);
-    window.setTimeout(scheduleSidebarOffsetUpdate, 100);
-    window.setTimeout(scheduleSidebarOffsetUpdate, 350);
-
-    if (typeof ResizeObserver === "function") {
-      const resizeObserver = new ResizeObserver(() => {
-        scheduleSidebarOffsetUpdate();
-      });
-      resizeObserver.observe(wrap);
-      resizeObserver.observe(sidebar);
-    }
+    if (!wrap) return;
+    wrap.style.setProperty("--sidebar-offset", "0px");
   }
 
   function initAdditionalResources() {
@@ -233,6 +189,7 @@
     function renderFolderCard(file) {
       const title = file.name || "Document";
       const code = extractCodeFromName(title);
+      const thumbnailUrl = resolveResourceThumbnail(file);
       return `
 <div class="glass-card glass-card-3d stat-card additional-resource-card">
   <div class="additional-resource-card-inner">
@@ -244,7 +201,7 @@
       </div>
       <div class="stat-icon cyan additional-resource-icon">
         <div class="thumbnail">
-          <img class="thumbnailsub" src="${escapeHtml(file.thumbnail || "img/press1.png")}" alt="">
+          <img class="thumbnailsub" src="${escapeHtml(thumbnailUrl)}" alt="${escapeHtml(title)}">
         </div>
       </div>
     </div>
@@ -253,6 +210,15 @@
     </div>
   </div>
 </div>`;
+    }
+
+    function resolveResourceThumbnail(file) {
+      const rawThumbnail = stripPortalPrefix(String(file && file.thumbnail || "").trim());
+      return /^https?:\/\//i.test(rawThumbnail) ? rawThumbnail : stripPortalPrefix(STATIC_RESOURCE_THUMBNAIL_URL);
+    }
+
+    function stripPortalPrefix(value) {
+      return String(value || "").replace(/^\/portals\/0\//i, "");
     }
 
     function extractCodeFromName(value) {
@@ -298,6 +264,14 @@
       const pageFiles = additionalFiles.slice(startIndex, startIndex + additionalPageSize);
 
       secondaryMount.innerHTML = pageFiles.map((file) => renderFolderCard(file)).join("");
+
+      secondaryMount.querySelectorAll(".thumbnailsub").forEach((image) => {
+        const currentSrc = image.getAttribute("src") || "";
+        const cleanedSrc = stripPortalPrefix(currentSrc);
+        if (cleanedSrc && cleanedSrc !== currentSrc) {
+          image.setAttribute("src", cleanedSrc);
+        }
+      });
 
       secondaryMount.querySelectorAll("[data-download-file-id]").forEach((button) => {
         button.addEventListener("click", () => {
