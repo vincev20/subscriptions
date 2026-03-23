@@ -1,4 +1,4 @@
-:root {
+.allwrap {
   /* Primary Colors - Emerald & Gold Luxury 
 
         --emerald: #059669;
@@ -55,21 +55,11 @@
   --transition-fast: 0.2s ease;
   --transition-normal: 0.3s ease;
   --transition-slow: 0.5s ease;
-}
-html {
-  scroll-behavior: smooth;
-}
-body {
   font-family: 'Signika', sans-serif;
   background: var(--bg-dark);
   color: var(--text-primary);
   min-height: 100vh;
   overflow-x: hidden;
-  line-height: 1.6;
-}
-.allwrap {
-  font-family: 'Signika', sans-serif;
-  color: var(--text-primary);
   line-height: 1.6;
 }
 @keyframes float {
@@ -206,8 +196,8 @@ body {
 }
 .allwrap .sidebar {
   position: fixed;
-  left: 0;
-  top: 0;
+  left: 190px;
+  top: 150px;
   width: var(--sidebar-width);
   height: 100vh;
   background: var(--glass-bg);
